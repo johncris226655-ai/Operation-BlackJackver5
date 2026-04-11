@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TERMINAL: OPERATION BLACKJACK</title>
+    <style>
+        :root {
+            --blood: #880000;
+            --paper: #c2b280;
+            --ink: #1a1a1a;
+        }
+
+        body {
+            background-color: #050505;
+            color: var(--paper);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            overflow-y: auto;
+            display: flex;
+            justify-content: center;
+            background-image: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+        }
+
+        body::before {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 10;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        #main-container {
+            width: 95%;
+            max-width: 1000px;
+            min-height: 100vh;
+            background: rgba(10, 10, 10, 0.95);
+            padding: 20px;
+            box-sizing: border-box;
+            position: relative;
+            box-shadow: 0 0 50px #000;
+            border-left: 1px solid #333;
+            border-right: 1px solid #333;
+        }
+
+        .screen { display: none; flex-direction: column; align-items: center; text-align: center; }
+        .active { display: flex; }
+
+        h1, h2 { color: var(--blood); text-transform: uppercase; letter-spacing: 3px; text-shadow: 2px 2px #000; }
+
+        .dossier-box {
+            background: var(--paper);
+            color: var(--ink);
+            padding: 20px;
+            border: 1px solid #999;
+            box-shadow: 8px 8px 0px var(--blood);
+            margin: 20px 0;
+            width: 90%;
+        }
+
+        video, canvas { 
+            border: 8px solid #fff; 
+            background: #000; 
+            width: 280px; height: 210px; 
+            object-fit: cover; 
+            filter: grayscale(100%) contrast(120%);
+        }
+
+        .btn {
+            background: var(--blood);
+            color: #fff;
+            border: 1px solid #fff;
+            padding: 12px 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-family: 'Courier New', monospace;
+            margin: 10px;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .player-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 15px;
+            width: 100%;
+            margin: 20px 0;
+        }
+
+        .id-card {
+            border: 1px solid var(--blood);
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .id-card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; filter: sepia(1); }
+
+        .current-voter-img {
+            width: 120px; height: 120px;
+            border: 3px solid var(--blood);
+            margin: 10px;
+        }
+
+        .card-options { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .card-btn {
+            width: 80px; height: 110px;
+            border: 2px solid var(--paper);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            cursor: pointer; background: rgba(0,0,0,0.5);
+            font-size: 0.9rem;
+            pointer-events: none; opacity: 0.5;
+        }
+        .card-btn.ready { pointer-events: auto; opacity: 1; }
+        .card-btn:hover { background: var(--blood); }
+
+        #timer-box { font-size: 2.5rem; color: var(--blood); font-weight: bold; height: 50px; }
+    </style>
+</head>
+<body>
+
+<div id="main-container">
+    <div id="setup-screen" class="screen active">
+        <h1>[ SUBJECT ENTRY ]</h1>
+        <div class="dossier-box">
+            <input type="text" id="p-name" placeholder="CODENAME..." style="width: 80%; padding: 10px; font-family: monospace;">
+            <br><br>
+            <video id="webcam" autoplay playsinline></video>
+            <canvas id="photo-canvas" style="display:none;"></canvas>
+            <br>
+            <button class="btn" id="capture-btn" onclick="captureIdentity()">IDENTIFY SUBJECT</button>
+        </div>
+        <div id="reg-list" class="player-grid"></div>
+        <button id="start-btn" class="btn" style="display:none;" onclick="requestGameStart()">START OPERATION</button>
+    </div>
+
+    <div id="intel-screen" class="screen">
+        <h2 id="pass-instr">PASS DEVICE</h2>
+        <div id="intel-content" class="dossier-box" style="display:none;">
+            <h3>INTEL REPORT</h3>
+            <div id="intel-grid" class="player-grid"></div>
+            <button class="btn" id="intel-done-btn" onclick="intelAction()" disabled>CONTINUE</button>
+        </div>
+        <button id="reveal-btn" class="btn" onclick="showIntel()" style="display:none;">ACCESS INTEL</button>
+    </div>
+
+    <div id="vote-screen" class="screen">
+        <div id="timer-box"></div>
+        <h2 id="voter-name-label">NAME</h2>
+        <div id="voter-photo-box"></div>
+        <div class="card-options" id="voting-btns">
+            <div class="card-btn" onclick="submitVote('CLUBS', this)">♣<br>CLUBS</div>
+            <div class="card-btn" onclick="submitVote('SPADES', this)">♠<br>SPADES</div>
+            <div class="card-btn" onclick="submitVote('HEARTS', this)">♥<br>HEARTS</div>
+            <div class="card-btn" onclick="submitVote('DIAMONDS', this)">♦<br>DIAMONDS</div>
+        </div>
+    </div>
+
+    <div id="jack-hunt-screen" class="screen">
+        <h1>[ TERMINATE THE JACK ]</h1>
+        <div id="hunt-grid" class="player-grid"></div>
+    </div>
+
+    <div id="game-over-screen" class="screen">
+        <h1 id="win-message">GAME OVER</h1>
+        <div id="survivor-list" class="player-grid"></div>
+        <button class="btn" onclick="location.reload()">RESTART</button>
+    </div>
+</div>
+
+<script>
+    let players = [];
+    let currentPlayerIndex = 0;
+    const suites = ['CLUBS', 'SPADES', 'HEARTS', 'DIAMONDS'];
+    let timerInt;
+    let gamePhase = "ROUND_1_INTEL"; 
+    let intelCounter = 0;
+    let canClick = false;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(freq, type, dur) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + dur);
+    }
+
+    const sfx = {
+        click: () => playSound(400, 'square', 0.1),
+        death: () => playSound(100, 'sawtooth', 0.5),
+        win: () => playSound(600, 'sine', 0.8),
+        beep: () => playSound(800, 'sine', 0.05)
+    };
+
+    const video = document.getElementById('webcam');
+    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => video.srcObject = stream);
+
+    function speak(text, callback) {
+        window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(text);
+        msg.rate = 0.8; msg.pitch = 0.2; msg.lang = 'en-US';
+        msg.onend = () => { if(callback) callback(); };
+        window.speechSynthesis.speak(msg);
+    }
+
+    function captureIdentity() {
+        const nameInput = document.getElementById('p-name');
+        const name = nameInput.value;
+        if(!name) return;
+        sfx.click();
+        const canvas = document.getElementById('photo-canvas');
+        canvas.getContext('2d').drawImage(video, 0, 0, 320, 240);
+        players.push({
+            name: name,
+            photo: canvas.toDataURL('image/png'),
+            card: suites[Math.floor(Math.random() * 4)],
+            fakeCard: suites[Math.floor(Math.random() * 4)],
+            isJack: false, alive: true
+        });
+        nameInput.value = "";
+        updateRegList();
+        speak(`${name} identified.`);
+        if(players.length >= 3) document.getElementById('start-btn').style.display = "block";
+    }
+
+    function updateRegList() {
+        document.getElementById('reg-list').innerHTML = players.map(p => `
+            <div class="id-card"><img src="${p.photo}"><p>${p.name}</p></div>
+        `).join('');
+    }
+
+    function requestGameStart() {
+        sfx.click();
+        document.documentElement.requestFullscreen().catch(() => {});
+        players[Math.floor(Math.random() * players.length)].isJack = true;
+        currentPlayerIndex = Math.floor(Math.random() * players.length);
+        gamePhase = "ROUND_1_INTEL";
+        intelCounter = 0;
+        document.getElementById('setup-screen').classList.remove('active');
+        startIntelPhase();
+    }
+
+    function startIntelPhase() {
+        const p = players[currentPlayerIndex];
+        document.getElementById('vote-screen').classList.remove('active');
+        document.getElementById('intel-screen').classList.add('active');
+        document.getElementById('intel-content').style.display = "none";
+        document.getElementById('reveal-btn').style.display = "none";
+        document.getElementById('pass-instr').innerText = `PASS TO: ${p.name}`;
+        
+        speak(`Pass the device to ${p.name}.`, () => {
+            document.getElementById('reveal-btn').style.display = "block";
+        });
+    }
+
+    function showIntel() {
+        sfx.click();
+        const me = players[currentPlayerIndex];
+        const grid = document.getElementById('intel-grid');
+        grid.innerHTML = "";
+        players.forEach((p, i) => {
+            if(!p.alive) return;
+            let display = (i === currentPlayerIndex) ? (me.isJack ? me.card + " (JACK)" : "???") : (p.isJack ? p.fakeCard : p.card);
+            grid.innerHTML += `<div class="id-card"><img src="${p.photo}"><p>${p.name}</p><p style="color:var(--blood)">${display}</p></div>`;
+        });
+        document.getElementById('reveal-btn').style.display = "none";
+        document.getElementById('intel-content').style.display = "block";
+        
+        const btn = document.getElementById('intel-done-btn');
+        btn.disabled = true;
+        speak("Memorize the data.", () => {
+            btn.disabled = false;
+        });
+    }
+
+    function intelAction() {
+        sfx.click();
+        if (gamePhase === "ROUND_1_INTEL") {
+            intelCounter++;
+            if (intelCounter < players.length) {
+                currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+                startIntelPhase();
+            } else {
+                gamePhase = "VOTING_PHASE";
+                currentPlayerIndex = Math.floor(Math.random() * players.length);
+                speak("Preliminary intel phase complete. Voting sequence initiated.", () => {
+                    startIntelPhase();
+                });
+            }
+        } else {
+            document.getElementById('intel-screen').classList.remove('active');
+            document.getElementById('vote-screen').classList.add('active');
+            const p = players[currentPlayerIndex];
+            document.getElementById('voter-name-label').innerText = p.name;
+            document.getElementById('voter-photo-box').innerHTML = `<img src="${p.photo}" class="current-voter-img">`;
+            document.getElementById('timer-box').innerText = "";
+            
+            const btns = document.querySelectorAll('.card-btn');
+            btns.forEach(b => b.classList.remove('ready'));
+            canClick = false;
+
+            speak(`${p.name}, you have ten seconds to vote.`, () => {
+                btns.forEach(b => b.classList.add('ready'));
+                canClick = true;
+                runCountdown(10);
+            });
+        }
+    }
+
+    function runCountdown(sec) {
+        let currentSec = sec;
+        document.getElementById('timer-box').innerText = currentSec;
+        speak(currentSec.toString());
+
+        timerInt = setInterval(() => {
+            currentSec--;
+            if (currentSec >= 0) {
+                document.getElementById('timer-box').innerText = currentSec;
+                sfx.beep();
+                speak(currentSec.toString());
+            }
+            if (currentSec <= 0) {
+                clearInterval(timerInt);
+                if(canClick) submitVote("TIMEOUT", null);
+            }
+        }, 1200); // 1.2s delay to allow AI to speak the number
+    }
+
+    function submitVote(choice, btnElement) {
+        if(!canClick) return;
+        canClick = false; // Lock immediately
+        clearInterval(timerInt);
+        sfx.click();
+
+        const btns = document.querySelectorAll('.card-btn');
+        btns.forEach(b => b.classList.remove('ready'));
+
+        const p = players[currentPlayerIndex];
+        if(p.isJack || choice === p.card) {
+            speak("Correct.");
+        } else {
+            sfx.death(); p.alive = false;
+            speak(`Wrong. Your card was ${p.card}. Elimination complete.`);
+        }
+        setTimeout(nextTurn, 2500);
+    }
+
+    function nextTurn() {
+        const alive = players.filter(p => p.alive);
+        if(!alive.find(p => p.isJack)) return endGame("CIVILIANS WIN");
+        if(alive.length === 2) return endGame("JACK WINS");
+        if(alive.length === 3) return startJackHunt();
+        
+        do { currentPlayerIndex = (currentPlayerIndex + 1) % players.length; } while (!players[currentPlayerIndex].alive);
+        startIntelPhase();
+    }
+
+    function startJackHunt() {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById('jack-hunt-screen').classList.add('active');
+        const grid = document.getElementById('hunt-grid');
+        grid.innerHTML = "";
+        canClick = false;
+        speak("Three remain. Identity of the Jack is required. Choose wisely.", () => {
+            canClick = true;
+        });
+        players.filter(p => p.alive).forEach(p => {
+            grid.innerHTML += `<div class="id-card" onclick="voteOut('${p.name}')" style="cursor:pointer"><img src="${p.photo}"><p>${p.name}</p></div>`;
+        });
+    }
+
+    function voteOut(name) {
+        if(!canClick) return;
+        canClick = false;
+        const p = players.find(x => x.name === name);
+        if(p.isJack) { speak(`${name} was the Jack. Operation Successful.`); endGame("CIVILIANS WIN"); }
+        else { speak(`${name} was innocent. The Jack has escaped. Operation Failed.`); endGame("JACK WINS"); }
+    }
+
+    function endGame(res) {
+        sfx.win();
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById('game-over-screen').classList.add('active');
+        document.getElementById('win-message').innerText = res;
+        document.getElementById('survivor-list').innerHTML = players.map(p => `
+            <div class="id-card" style="opacity:${p.alive?1:0.3}"><img src="${p.photo}"><p>${p.alive?'':'❌ '}${p.name}</p></div>
+        `).join('');
+    }
+</script>
+</body>
+</html>

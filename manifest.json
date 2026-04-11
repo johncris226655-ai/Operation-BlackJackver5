@@ -1,0 +1,16 @@
+{
+  "short_name": "Only Truth",
+  "name": "The Truth Horror",
+  "icons": [
+    {
+      "src": "https://cdn.discordapp.com/attachments/1489990746575736923/1492461726904352898/images_44.jpg?ex=69db6acc&is=69da194c&hm=a16597b50696011f735205370d24c029d3034f0472627604179add83cbc90624&",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#050505",
+  "display": "standalone",
+  "theme_color": "#880000"
+}
