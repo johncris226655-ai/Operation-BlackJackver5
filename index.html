@@ -2,118 +2,77 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>THE 0.8 GAME - WINBOARD</title>
+    <title>K♥ TV DISPLAY</title>
     <style>
-        :root { --red: #ff0000; --black: #050505; --white: #ffffff; }
-        body { background: var(--black); color: var(--white); font-family: 'Courier New', Courier, monospace; text-align: center; margin: 0; overflow: hidden; text-transform: uppercase; }
+        :root { --red: #ff0000; --white: #ffffff; }
+        body { 
+            background: #000; color: #fff; font-family: 'Courier New', monospace; 
+            margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            height: 100vh; overflow: hidden; text-transform: uppercase;
+        }
+
+        /* TV Distortion */
+        body::after {
+            content: " "; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
+            z-index: 1000; background-size: 100% 4px; pointer-events: none;
+            animation: flicker 0.1s infinite;
+        }
+
+        @keyframes flicker { 0% { opacity: 0.9; } 50% { opacity: 1; } 100% { opacity: 0.9; } }
+
+        #target-box { font-size: 6rem; border: 10px solid var(--red); padding: 20px 60px; color: var(--red); margin-bottom: 20px; }
         
-        /* CRT EFFECT */
-        body::before { content: " "; display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06)); z-index: 10; background-size: 100% 4px, 3px 100%; pointer-events: none; }
-        
-        #content { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 20px solid #111; box-sizing: border-box; }
-        h1 { font-size: 5rem; letter-spacing: 10px; color: var(--white); text-shadow: 3px 3px var(--red); margin: 0; }
-        
-        .rules-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--black); z-index: 100; display: flex; flex-direction: column; justify-content: center; padding: 40px; box-sizing: border-box; }
-        .rules-text { font-size: 2rem; color: var(--red); border: 2px solid var(--red); padding: 30px; line-height: 1.5; }
-        
-        .winner-banner { font-size: 6rem; color: var(--red); text-shadow: 0 0 20px var(--red); animation: blink 0.8s infinite; margin-top: 20px; }
-        .target-box { font-size: 3rem; margin: 20px; border: 1px solid var(--white); padding: 10px 40px; }
-        
-        table { width: 85%; border-collapse: collapse; font-size: 2.5rem; margin-top: 30px; }
-        th { border-bottom: 5px solid var(--red); padding: 15px; }
-        td { border-bottom: 1px solid #333; padding: 15px; }
-        
-        .hidden { display: none !important; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
-        #fs-btn { position: fixed; top: 10px; right: 10px; background: var(--red); color: white; border: none; padding: 10px; z-index: 1000; cursor: pointer; }
+        table { width: 90%; border-collapse: collapse; font-size: 2.5rem; }
+        th { border-bottom: 5px solid var(--white); padding: 10px; color: var(--red); }
+        td { padding: 20px; text-align: center; border-bottom: 1px solid #222; }
+
+        .winner-row { background: var(--white); color: #000; animation: flash 0.6s step-end infinite; }
+        @keyframes flash { 50% { background: var(--red); color: #fff; } }
+
+        #secret-fs-tv { position: fixed; top:0; left:0; width: 50px; height:50px; z-index: 9999; }
     </style>
 </head>
 <body>
-    <button id="fs-btn" onclick="openFullscreen()">FULLSCREEN SYSTEM</button>
 
-    <div id="rules" class="rules-overlay">
-        <h1>THE 0.8 GAME</h1>
-        <div class="rules-text" id="rules-content">
-            RULES OF THE GAME:<br>
-            1. ALL PLAYERS CHOOSE A NUMBER BETWEEN 0 AND 100.<br>
-            2. THE AVERAGE OF ALL NUMBERS IS MULTIPLIED BY 0.8.<br>
-            3. THE PLAYER CLOSEST TO THE TARGET NUMBER WINS.<br>
-            4. LOSERS LOSE 1 POINT. THE LAST SURVIVOR WINS.
-        </div>
-        <button onclick="startSequence()" style="margin-top:20px; padding:20px; background:white; font-weight:bold;">INITIATE GAME</button>
-    </div>
+    <div id="secret-fs-tv" onclick="document.documentElement.requestFullscreen()"></div>
 
-    <div id="content">
-        <h1 id="screen-title">WAITING FOR DATA</h1>
-        <div id="result-area" class="hidden">
-            <div id="winner-display" class="winner-banner"></div>
-            <div id="target-display" class="target-box"></div>
-        </div>
-        <table id="score-table">
-            <thead>
-                <tr><th>PLAYER</th><th id="ch-col" class="hidden">CHOICE</th><th>POINTS</th></tr>
-            </thead>
-            <tbody id="p-list"></tbody>
-        </table>
-    </div>
+    <div style="font-size: 2rem; letter-spacing: 15px; margin-bottom: 10px;">TARGET NUMBER</div>
+    <div id="target-box">00.00</div>
+
+    <table>
+        <thead>
+            <tr><th>PLAYER</th><th>NUMBER</th><th>SCORE</th></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+    </table>
 
     <script>
-        const SCRIPT_URL = "IYONG_URL_DITO"; 
-
-        function speak(text) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'en-US';
-            utterance.rate = 0.9;
-            window.speechSynthesis.speak(utterance);
+        function speak(txt) {
+            let u = new SpeechSynthesisUtterance(txt);
+            u.rate = 0.8; u.pitch = 0.5; // Robotic Deep Voice
+            window.speechSynthesis.speak(u);
         }
 
-        function openFullscreen() {
-            let elem = document.documentElement;
-            if (elem.requestFullscreen) elem.requestFullscreen();
-        }
+        window.addEventListener('storage', (e) => {
+            if (e.key !== 'k-data') return;
+            let data = JSON.parse(e.newValue);
+            
+            document.getElementById('target-box').innerText = data.target;
 
-        function startSequence() {
-            document.getElementById('rules').classList.add('hidden');
-            speak("Welcome to the Zero Point Eight Game. Rules have been established. Registration is now open on your devices.");
-            update();
-        }
+            let html = "";
+            data.players.forEach(p => {
+                let isW = (p.name === data.winner);
+                html += `<tr class="${isW ? 'winner-row' : ''}">
+                    <td>${p.name}</td>
+                    <td>${p.choice}</td>
+                    <td>${p.points}</td>
+                </tr>`;
+            });
+            document.getElementById('tbody').innerHTML = html;
 
-        async function update() {
-            try {
-                let res = await fetch(SCRIPT_URL);
-                let data = await res.json();
-                const list = document.getElementById('p-list');
-                const resultArea = document.getElementById('result-area');
-                const chCol = document.getElementById('ch-col');
-                const title = document.getElementById('screen-title');
-
-                list.innerHTML = "";
-                
-                if(data.status === "REVEAL") {
-                    title.innerText = "ROUND RESULTS";
-                    resultArea.classList.remove('hidden');
-                    chCol.classList.remove('hidden');
-                    document.getElementById('winner-display').innerText = "WINNER: " + data.winner;
-                    document.getElementById('target-display').innerText = "TARGET: " + data.target;
-                    
-                    // Voice Announcement once
-                    if(!window.announced) {
-                        speak("The target number is " + data.target + ". The winner is " + data.winner + ". Prepare for the next round.");
-                        window.announced = true;
-                    }
-                } else {
-                    title.innerText = "CURRENT STANDINGS";
-                    resultArea.classList.add('hidden');
-                    chCol.classList.add('hidden');
-                    window.announced = false;
-                }
-
-                data.players.forEach(p => {
-                    list.innerHTML += `<tr><td>${p[0]}</td><td class="${data.status === 'REVEAL' ? '' : 'hidden'}">${p[1]}</td><td>${p[2]}</td></tr>`;
-                });
-            } catch(e) {}
-        }
-        setInterval(update, 3000);
+            speak(`The target number is ${data.target}. The winner of this round is ${data.winner}.`);
+        });
     </script>
 </body>
 </html>
