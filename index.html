@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>K♥ TV DISPLAY</title>
+    <title>K♥ TV DISPLAY - WIRELESS</title>
     <style>
         :root { --red: #ff0000; --white: #ffffff; }
         body { 
@@ -11,14 +11,13 @@
             height: 100vh; overflow: hidden; text-transform: uppercase;
         }
 
-        /* TV Distortion */
-        body::after {
+        /* TV Scanline Effect */
+        body::before {
             content: " "; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
             z-index: 1000; background-size: 100% 4px; pointer-events: none;
             animation: flicker 0.1s infinite;
         }
-
         @keyframes flicker { 0% { opacity: 0.9; } 50% { opacity: 1; } 100% { opacity: 0.9; } }
 
         #target-box { font-size: 6rem; border: 10px solid var(--red); padding: 20px 60px; color: var(--red); margin-bottom: 20px; }
@@ -30,49 +29,76 @@
         .winner-row { background: var(--white); color: #000; animation: flash 0.6s step-end infinite; }
         @keyframes flash { 50% { background: var(--red); color: #fff; } }
 
-        #secret-fs-tv { position: fixed; top:0; left:0; width: 50px; height:50px; z-index: 9999; }
+        #secret-fs-tv { position: fixed; top:0; left:0; width: 60px; height:60px; z-index: 9999; background: transparent; }
+        #status-msg { position: fixed; bottom: 10px; right: 10px; font-size: 0.8rem; color: #444; }
     </style>
 </head>
 <body>
 
     <div id="secret-fs-tv" onclick="document.documentElement.requestFullscreen()"></div>
+    <div id="status-msg">SYNCING WITH GOOGLE SHEETS...</div>
 
     <div style="font-size: 2rem; letter-spacing: 15px; margin-bottom: 10px;">TARGET NUMBER</div>
-    <div id="target-box">00.00</div>
+    <div id="target-box">--.--</div>
 
     <table>
         <thead>
             <tr><th>PLAYER</th><th>NUMBER</th><th>SCORE</th></tr>
         </thead>
-        <tbody id="tbody"></tbody>
+        <tbody id="tbody">
+            <tr><td colspan="3">WAITING FOR ROUND...</td></tr>
+        </tbody>
     </table>
 
     <script>
+        const API_URL = "https://sheetdb.io/api/v1/9ek4y5qsdopmi";
+        let lastTimestamp = "";
+
         function speak(txt) {
+            window.speechSynthesis.cancel(); // Stop current speech
             let u = new SpeechSynthesisUtterance(txt);
-            u.rate = 0.8; u.pitch = 0.5; // Robotic Deep Voice
+            u.rate = 0.8; u.pitch = 0.5;
             window.speechSynthesis.speak(u);
         }
 
-        window.addEventListener('storage', (e) => {
-            if (e.key !== 'k-data') return;
-            let data = JSON.parse(e.newValue);
-            
-            document.getElementById('target-box').innerText = data.target;
+        async function updateFromSheets() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    const latest = data[data.length - 1]; // Kunin ang pinakabagong row
 
-            let html = "";
-            data.players.forEach(p => {
-                let isW = (p.name === data.winner);
-                html += `<tr class="${isW ? 'winner-row' : ''}">
-                    <td>${p.name}</td>
-                    <td>${p.choice}</td>
-                    <td>${p.points}</td>
-                </tr>`;
-            });
-            document.getElementById('tbody').innerHTML = html;
+                    // Kung may bago silang row (base sa Timestamp)
+                    if (latest.Timestamp !== lastTimestamp) {
+                        lastTimestamp = latest.Timestamp;
+                        
+                        document.getElementById('target-box').innerText = latest.Target;
+                        
+                        // I-parse ang Leaderboard (Format: NAME:SCORE, NAME:SCORE)
+                        let playersRaw = latest.Leaderboard.split(", ");
+                        let html = "";
+                        
+                        playersRaw.forEach(pData => {
+                            let [name, score] = pData.split(":");
+                            let isW = (name === latest.Winner);
+                            html += `<tr class="${isW ? 'winner-row' : ''}">
+                                <td>${name}</td>
+                                <td>-</td> <td>${score}</td>
+                            </tr>`;
+                        });
 
-            speak(`The target number is ${data.target}. The winner of this round is ${data.winner}.`);
-        });
+                        document.getElementById('tbody').innerHTML = html;
+                        speak(`The target number is ${latest.Target}. The winner is ${latest.Winner}.`);
+                    }
+                }
+            } catch (e) {
+                console.error("SheetDB Sync Error:", e);
+            }
+        }
+
+        // Mag-check bawat 3 segundo
+        setInterval(updateFromSheets, 3000);
     </script>
 </body>
 </html>
